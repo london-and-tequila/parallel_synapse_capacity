@@ -77,7 +77,7 @@ def custom_pdf(x, a = 0., b = .5):
 
 def inverse_cdf(p):
     '''
-    what is this??
+    inverse cdf of a custom distribution
     '''
     x = np.linspace(0, 1, 1000) 
     cdf = np.cumsum(custom_pdf(x))/np.sum(custom_pdf(x))   
