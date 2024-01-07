@@ -71,7 +71,7 @@ def hinge_loss(actv,  label, theta, margin):
 
 def custom_pdf(x, a = 0., b = .5):
     '''
-    
+    cdf of a custom distribution, more threshold towards 0 or 1
     '''
     return b * np.abs(x-.5) + a
 
@@ -79,10 +79,10 @@ def inverse_cdf(p):
     '''
     what is this??
     '''
-    
-	x = np.linspace(0, 1, 1000) 
-	cdf = np.cumsum(custom_pdf(x))/np.sum(custom_pdf(x))   
-	return np.interp(p, cdf, x)
+    x = np.linspace(0, 1, 1000) 
+    cdf = np.cumsum(custom_pdf(x))/np.sum(custom_pdf(x))   
+    return np.interp(p, cdf, x)
+    # np.interp(p, cdf, x) is the inverse of cdf(p)
 
 def plot_trial(trial, model, path, repeat, t):
     '''
