@@ -155,6 +155,7 @@ class TrainParallelSyn():
                 self.time.append(time.time() - t1) 
                 
             if self.acc > 0.9999999:
+                print('accuracy reached 1')
                 break
         
     def shuffle_invalid(self, model):
