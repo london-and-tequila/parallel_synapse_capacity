@@ -4,7 +4,9 @@
 #include <math.h>
 #include <time.h>
 #include <omp.h>
-
+/*
+sum the elements of an int array
+*/
 int sum(int arr[], int n)
 {
     int sum = 0;
@@ -14,6 +16,10 @@ int sum(int arr[], int n)
 
     return sum;
 }
+
+/*
+sum the elements of a double array
+*/
 double sum_double(double arr[], int n)
 {
     double sum = 0;
@@ -23,6 +29,9 @@ double sum_double(double arr[], int n)
 
     return sum;
 }
+/*
+find the minimum value and its index in a double array, return a struct MinId
+*/
 struct MinId
 {
     float yval;
@@ -45,7 +54,9 @@ struct MinId findmin(double arr[], int len)
 
     return minid;
 };
-
+/*
+define a struct ArraySize to store the size of each array
+*/
 struct ArraySize
 {
     int Labels, Weights, Rates;
@@ -53,6 +64,20 @@ struct ArraySize
     int Walk, ActvMat, MeasVec, MeasVec2;
     int TotAVec, Errors;
 };
+
+/*
+example usage of main function:
+    ./parallel_synapse_two_step 1000 18000 1
+
+Parameters:
+    N: number of neurons
+    P: number of synapses, i.e. problem size
+    trial_id: the id of the trial
+
+    Marg: margin of error, default: 0.000001
+    MaxIter: maximum number of iterations, default: 10000
+
+*/
 int main(int argc, char *argv[])
 {
     int trial_id = atoi(argv[3]);
@@ -142,6 +167,7 @@ int main(int argc, char *argv[])
     printf("array_size.TotAVec %d kB\n", array_size.TotAVec / 256);
 
 #pragma omp parallel for
+ // set the initial values of Weights, Rate, and Labels
     for (int i = 0; i < P; i++)
     {
         Weights[i] = 1;
@@ -151,7 +177,9 @@ int main(int argc, char *argv[])
         else
             Labels[i] = -1;
     }
-
+    // generate the random order of data on each input dimension
+    // OrdrMat is the matrix of the random order of data on each input dimension
+    // IOrdrMat is the matrix of the inverse of OrdrMat
     for (int i = 0; i < N; i++)
     {
 
@@ -191,13 +219,15 @@ int main(int argc, char *argv[])
     }
     for (int k = 0; k < P; k++)
         TotAVec[k] = (double)0;
+    // start two-step algorithm
     int j = 0;
     for (j = 0; j < MaxIter; j++)
     {
 
         printf("--------------------------------\n");
         printf("iter %d \n", j);
-        
+        // for each input dimension, compute activation from envolop function
+            
         for (int i = 0; i < N; i++)
         {
             memset(Walk, 0, sizeof(double) * (P + 1));
@@ -276,6 +306,7 @@ int main(int argc, char *argv[])
         }
 
 #pragma omp parallel for
+// compute the total activation for each data
         for (int k = 0; k < P; k++)
         {
             TotAVec[k] = 0;
@@ -295,12 +326,14 @@ int main(int argc, char *argv[])
         Thresh = sum_double(TotAVec, P);
         Thresh = Thresh / (double)P;
 #pragma omp parallel for
+ // compute the number of errors
         for (int k = 0; k < P; k++)
             Errors[k] = ((TotAVec[k] - Thresh) * (double)Labels[k]) < Marg * Thresh;
 
         NumError = sum(Errors, P);
         printf("NumError %d\n ", NumError);
-
+        // if the number of errors is 0, then the algorithm converges
+            // write the results to files
         if (NumError == 0)
         {
             printf("correct!\n");
@@ -361,6 +394,7 @@ int main(int argc, char *argv[])
         }
 
 #pragma omp parallel for
+// update the weights
         for (int k = 0; k < P; k++)
         {
             Rate[k] = Errors[k] * (Rate[k] + 0.2 * Errors[k]);
