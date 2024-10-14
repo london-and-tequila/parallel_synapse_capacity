@@ -206,8 +206,8 @@ if __name__ == "__main__":
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    # elif torch.backends.mps.is_available():
-    #     device = torch.device("mps")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
     else:
         device = torch.device("cpu")
     print(f"Using device: {device}")
@@ -274,6 +274,7 @@ if __name__ == "__main__":
             nSample=train_params["P"],
             randomSeed=model_params["seed"],
             device=model_params["device"],
+            distribution=model_params["distribution"],
         )
         path = ""
         path += (
