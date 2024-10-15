@@ -12,7 +12,7 @@ def generate_data_torch(
     nSample=100,
     randomSeed=2,
     device=torch.device("cpu"),
-    distribution: Literal["uniform", "gaussian"] = "uniform",
+    distribution: Literal["uniform", "gaussian"] = "gaussian",
 ):
     """
     Create training data for the parallel synapse model trained with gradient descent algorithm
@@ -39,6 +39,34 @@ def generate_data_torch(
     label = torch.ones((nSample, 1), device=device).ravel()
     label[: int(nSample / 2)] = -1
     return data, label
+
+
+def add_noise(data, label, noise_type="uniform", noise_size=0.1, noise_repeat=5):
+    """
+    Add noise to the data,
+    if uniform noise, noise in U(-noise_size, noise_size)
+    if gaussian noise, noise in N(0, noise_size)
+    """
+    noisy_data_all = []
+    label_all = []
+    for i in range(noise_repeat):
+        if noise_type == "uniform":
+            noise = torch.rand_like(data) * noise_size
+            noise = noise - 0.5 * noise_size
+
+        elif noise_type == "gaussian":
+            noise = torch.randn_like(data) * noise_size
+        else:
+            raise ValueError("Invalid noise type")
+        # Ensure noise is within [0, 1] range by reflecting values outside this range
+        noisy_data = data + noise
+        noisy_data = torch.where(noisy_data < 0, -noisy_data, noisy_data)
+        noisy_data = torch.where(noisy_data > 1, 2 - noisy_data, noisy_data)
+        noisy_data_all.append(noisy_data)
+        label_all.append(label)
+    noisy_data_all = torch.cat(noisy_data_all, dim=0)
+    label_all = torch.cat(label_all, dim=0)
+    return noisy_data_all, label_all
 
 
 def load_model(path):
