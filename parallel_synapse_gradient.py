@@ -8,6 +8,8 @@ import torch
 
 from utils_parallel_syn_gradient import *
 
+ACCURACY_THRESHOLD = 0.999999
+
 
 class ParallelSyn(torch.nn.Module):
     """
@@ -122,7 +124,8 @@ class TrainParallelSyn:
         """
         Compute accuracy from the activation of the neuron and the label of the samples
         """
-        self.acc = (torch.sign(model.actv - model.theta) == label).sum() / self.P
+        n_samples = label.shape[0]
+        self.acc = (torch.sign(model.actv - model.theta) == label).sum() / n_samples
 
     def train(self, model, label, inputX, t1):
         # set up optimizer
@@ -176,7 +179,7 @@ class TrainParallelSyn:
                 self.loss_history.append(self.loss.detach())
                 self.time.append(time.time() - t1)
 
-            if self.acc > 0.9999999:
+            if self.acc > ACCURACY_THRESHOLD:
                 print("accuracy reached 1")
                 break
 
@@ -301,7 +304,7 @@ if __name__ == "__main__":
         trial.train(model, label, inputX, t1)
 
         print(f"Repeat: {repeat}, accuracy: {trial.acc}")
-        if trial.acc > 0.999999:
+        if trial.acc > ACCURACY_THRESHOLD:
             plot_trial(
                 trial,
                 model,

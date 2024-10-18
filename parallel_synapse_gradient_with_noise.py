@@ -4,7 +4,7 @@ import time
 
 import torch
 
-from parallel_synapse_gradient import ParallelSyn, TrainParallelSyn
+from parallel_synapse_gradient import ACCURACY_THRESHOLD, ParallelSyn, TrainParallelSyn
 from utils_parallel_syn_gradient import (
     add_noise,
     generate_data_torch,
@@ -12,22 +12,6 @@ from utils_parallel_syn_gradient import (
     plot_trial,
     save_model,
 )
-
-
-class TrainParallelSynWithNoise(TrainParallelSyn):
-    def __init__(self, train_params):
-        super().__init__(train_params)
-        for k, v in train_params.items():
-            if k != "noise_size" and k != "noise_repeat":
-                setattr(self, k, v)
-        self.noise_size = train_params["noise_size"]
-        self.noise_repeat = train_params["noise_repeat"]
-
-    def accu(self, model, label):
-        self.acc = (torch.sign(model.actv - model.theta) == label).sum() / (
-            self.P * self.noise_repeat
-        )
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -140,13 +124,13 @@ if __name__ == "__main__":
         model = ParallelSyn(model_params)
         model.to(model_params["device"])
 
-    trial = TrainParallelSynWithNoise(train_params)
+    trial = TrainParallelSyn(train_params)
     t1 = time.time()
     for repeat in range(800):
         trial.train(model, label, inputX, t1)
 
         print(f"Repeat: {repeat}, accuracy: {trial.acc}")
-        if trial.acc > 0.999999:
+        if trial.acc > ACCURACY_THRESHOLD:
             plot_trial(
                 trial,
                 model,
@@ -160,7 +144,7 @@ if __name__ == "__main__":
         plot_trial(
             trial,
             model,
-            folder + "_png" + "/" + path + "_true",
+            folder + "_png" + "/" + path,
             repeat,
             time.time() - t1,
         )
