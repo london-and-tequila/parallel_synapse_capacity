@@ -66,6 +66,7 @@ class ParallelSyn(torch.nn.Module):
         self.actv = torch.tanh(self.actv)
         self.actv = self.ampli.pow(2).unsqueeze(0) * self.actv
         self.actv = self.actv.mean(dim=(1, 2))
+        return self.actv
 
 
 class TrainParallelSyn:

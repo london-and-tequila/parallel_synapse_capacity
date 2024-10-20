@@ -1,6 +1,7 @@
 import argparse
 import os
 import time
+from collections import defaultdict, deque
 
 import numpy as np
 import torch
@@ -26,6 +27,24 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
 
     def __init__(self, train_params):
         super().__init__(train_params)
+        self.acc_noisy_train_history = deque()
+        self.acc_noisy_test_history = deque()
+
+    def accu_all(self, model, actv_dict):
+        """
+        Compute accuracy of the model on the original data, noisy training data, and noisy testing data
+
+        Args:
+            model (_type_): _description_
+            actv_dict (_type_): _description_
+        Returns:
+            dict: accuracy of the model on the original data, noisy training data, and noisy testing data
+        """
+        acc_dict = defaultdict(float)
+        for key, (actv, label) in actv_dict.items():
+            n_samples = label.shape[0]
+            acc_dict[key] = (torch.sign(actv - model.theta) == label).sum() / n_samples
+        return acc_dict
 
     def train(self, model: ParallelSyn, data: dict, t1: float):
         """
@@ -33,10 +52,23 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
         Args:
             model (ParallelSyn)
             data (dict): {
-                "input
+                "inputX": torch.tensor,
+                "label": torch.tensor,
+                "inputX_noisy_train": torch.tensor,
+                "label_noisy_train": torch.tensor,
+                "inputX_noisy_test": torch.tensor,
+                "label_noisy_test": torch.tensor,
             }
             t1 (float): _description_
         """
+        # unpack data
+        inputX = data["inputX"]
+        label = data["label"]
+        inputX_noisy_train = data["inputX_noisy_train"]
+        label_noisy_train = data["label_noisy_train"]
+        inputX_noisy_test = data["inputX_noisy_test"]
+        label_noisy_test = data["label_noisy_test"]
+
         # set up optimizer
         self.optim = torch.optim.Adam(
             [
@@ -61,7 +93,7 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
                 device=model.device,
                 dtype=torch.float32,
             ).float()
-
+        actv_dict = {}
         for k in range(self.Nepoch):
             self.shuffle_invalid(model)
 
@@ -69,27 +101,49 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
                 # clamp the slope to be non-negative
                 model.slope.clamp_min_(0)
 
-            model.forward(inputX)
-            self.lossFunc(model, label)
+            model.forward(inputX_noisy_train)
+            self.lossFunc(model, label_noisy_train)
+
             self.loss.backward()
             self.optim.step()
             self.optim.zero_grad()
 
-            model.forward(inputX)
-            self.accu(model, label)
+            # test on original data
+            actv = model.forward(inputX)
+
+            # test on noisy training data
+            actv_noisy_train = model.forward(inputX_noisy_train)
+
+            # test on noisy testing data
+            actv_noisy_test = model.forward(inputX_noisy_test)
+
+            actv_dict["original"] = (actv, label)
+            actv_dict["noisy_train"] = (actv_noisy_train, label_noisy_train)
+            actv_dict["noisy_test"] = (actv_noisy_test, label_noisy_test)
+
+            acc_dict = self.accu_all(model, actv_dict)
 
             # record the loss and accuracy every downSample epochs
             if (k % self.downSample) == 5:
                 if len(self.acc_history) > self.maxRecord * self.downSample:
                     self.acc_history.popleft()
                     self.loss_history.popleft()
+                    self.acc_noisy_train_history.popleft()
+                    self.acc_noisy_test_history.popleft()
                     self.time.popleft()
-                self.acc_history.append(self.acc.detach())
+                self.acc_history.append(acc_dict["original"])
                 self.loss_history.append(self.loss.detach())
+                self.acc_noisy_train_history.append(acc_dict["noisy_train"])
+                self.acc_noisy_test_history.append(acc_dict["noisy_test"])
+
                 self.time.append(time.time() - t1)
 
-            if self.acc > ACCURACY_THRESHOLD:
-                print("accuracy reached 1")
+            if (
+                acc_dict["original"] > ACCURACY_THRESHOLD
+                and acc_dict["noisy_train"] > ACCURACY_THRESHOLD
+                and acc_dict["noisy_test"] > ACCURACY_THRESHOLD
+            ):
+                print("accuracy all reached 1")
                 break
 
 
@@ -163,6 +217,19 @@ if __name__ == "__main__":
             data_[:, :-1].to(model_params["device"]),
             data_[:, -1].to(model_params["device"]),
         )
+
+        data_ = load_model(folder + "/" + path + "_noisy_train_data")
+        inputX_noisy_train, label_noisy_train = (
+            data_[:, :-1].to(model_params["device"]),
+            data_[:, -1].to(model_params["device"]),
+        )
+
+        data_ = load_model(folder + "/" + path + "_noisy_test_data")
+        inputX_noisy_test, label_noisy_test = (
+            data_[:, :-1].to(model_params["device"]),
+            data_[:, -1].to(model_params["device"]),
+        )
+
         model = ParallelSyn(model_params)
         model.to(model_params["device"])
         state_dict = torch.load(
@@ -226,10 +293,19 @@ if __name__ == "__main__":
         model = ParallelSyn(model_params)
         model.to(model_params["device"])
 
+    data = {
+        "inputX": inputX,
+        "label": label,
+        "inputX_noisy_train": inputX_noisy_train,
+        "label_noisy_train": label_noisy_train,
+        "inputX_noisy_test": inputX_noisy_test,
+        "label_noisy_test": label_noisy_test,
+    }
+
     trial = TrainParallelSynWithNoise(train_params)
     t1 = time.time()
     for repeat in range(800):
-        trial.train(model, label, inputX, t1)
+        trial.train(model, data, t1)
 
         print(f"Repeat: {repeat}, accuracy: {trial.acc}")
         if trial.acc > ACCURACY_THRESHOLD:
