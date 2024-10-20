@@ -1,8 +1,10 @@
 import argparse
+import datetime
 import os
 import time
 from collections import defaultdict, deque
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -12,9 +14,56 @@ from utils_parallel_syn_gradient import (
     generate_data_torch,
     inverse_cdf,
     load_model,
-    plot_trial,
     save_model,
 )
+
+
+def plot_trial(acc_history_dict, loss_history, model, path, repeat, t):
+    """
+    plot the training history, parameter distributions of a trial
+    """
+    acc_original_list = [acc.cpu() for acc in acc_history_dict["original"]]
+    acc_noisy_train_list = [acc.cpu() for acc in acc_history_dict["noisy_train"]]
+    acc_noisy_test_list = [acc.cpu() for acc in acc_history_dict["noisy_test"]]
+    loss_list = [loss.cpu() for loss in loss_history]
+    fig = plt.figure(figsize=(8, 5))
+    plt.subplot(2, 3, 1)
+    plt.plot(trial.time, acc_original_list, label="original")
+    plt.plot(trial.time, acc_noisy_train_list, label="noisy train")
+    plt.plot(trial.time, acc_noisy_test_list, label="noisy test")
+    plt.legend()
+    plt.title(
+        "acc. ={:.6f}, ".format(trial.acc.detach().cpu())
+        + str(repeat)
+        + " * "
+        + str(trial.Nepoch)
+        + " epoch"
+    )
+    plt.xlabel("time cost (s)")
+    plt.grid()
+    plt.subplot(2, 3, 2)
+    plt.plot(trial.time, loss_list)
+    plt.title("loss\n " + "time: " + str(datetime.timedelta(seconds=t)))
+    plt.xlabel("time cost (s)")
+    plt.grid()
+    plt.subplot(2, 3, 4)
+    plt.hist(model.thres.detach().cpu().numpy().ravel(), bins=30)
+    plt.title("thres hist")
+    plt.subplot(2, 3, 5)
+    plt.hist(model.slope.detach().cpu().numpy().ravel(), bins=30)
+    plt.title("slope hist")
+    plt.subplot(2, 3, 6)
+    plt.hist(model.ampli.detach().cpu().numpy().ravel(), bins=30)
+    plt.title(
+        "ampli hist, {:.3f} of ampli < {:.3f}".format(
+            (model.ampli.detach().cpu().numpy().ravel() < trial.minAmpli).mean(),
+            trial.minAmpli,
+        )
+    )
+    plt.tight_layout()
+    plt.savefig(path + ".png")
+    plt.close(fig)
+    # plt.show()
 
 
 class TrainParallelSynWithNoise(TrainParallelSyn):
@@ -46,7 +95,7 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
             acc_dict[key] = (torch.sign(actv - model.theta) == label).sum() / n_samples
         return acc_dict
 
-    def train(self, model: ParallelSyn, data: dict, t1: float):
+    def train_with_noise(self, model: ParallelSyn, data: dict, t1: float):
         """
 
         Args:
@@ -145,6 +194,7 @@ class TrainParallelSynWithNoise(TrainParallelSyn):
             ):
                 print("accuracy all reached 1")
                 break
+        return acc_dict
 
 
 if __name__ == "__main__":
@@ -180,7 +230,7 @@ if __name__ == "__main__":
         "threslr": 1e-6,
         "adamlr": 0.003,
         "minAmpli": 1e-1,
-        "Nepoch": 160000,
+        "Nepoch": 1600,
         "P": args.P,
         "maxRecord": 400,
         "downSample": 100,
@@ -207,7 +257,6 @@ if __name__ == "__main__":
     )
 
     # create folder to save the model and load the model if it exists
-    # TODO: modify below for dict input
     if os.path.isfile(folder + "/" + path + "_data") and os.path.isfile(
         folder + "/" + path
     ):
@@ -305,12 +354,21 @@ if __name__ == "__main__":
     trial = TrainParallelSynWithNoise(train_params)
     t1 = time.time()
     for repeat in range(800):
-        trial.train(model, data, t1)
-
-        print(f"Repeat: {repeat}, accuracy: {trial.acc}")
-        if trial.acc > ACCURACY_THRESHOLD:
+        acc_dict = trial.train_with_noise(model, data, t1)
+        print(
+            f"Repeat: {repeat}, acc_original: {acc_dict['original']}, "
+            + f"acc_noisy_train: {acc_dict['noisy_train']}, "
+            + f"acc_noisy_test: {acc_dict['noisy_test']}"
+        )
+        acc_history_dict = {
+            "original": trial.acc_history,
+            "noisy_train": trial.acc_noisy_train_history,
+            "noisy_test": trial.acc_noisy_test_history,
+        }
+        if acc_dict["original"] > ACCURACY_THRESHOLD:
             plot_trial(
-                trial,
+                acc_history_dict,
+                trial.loss_history,
                 model,
                 folder + "_png" + "/" + path + "_true",
                 repeat,
@@ -318,9 +376,32 @@ if __name__ == "__main__":
             )
             torch.save(model.state_dict(), folder + "/" + path)
             save_model(trial, folder + "/" + path + "_trial")
-            break
+        if acc_dict["noisy_train"] > ACCURACY_THRESHOLD:
+            plot_trial(
+                acc_history_dict,
+                trial.loss_history,
+                model,
+                folder + "_png" + "/" + path + "_noisy_train_true",
+                repeat,
+                time.time() - t1,
+            )
+            torch.save(model.state_dict(), folder + "/" + path)
+            save_model(trial, folder + "/" + path + "_trial")
+        if acc_dict["noisy_test"] > ACCURACY_THRESHOLD:
+            plot_trial(
+                acc_history_dict,
+                trial.loss_history,
+                model,
+                folder + "_png" + "/" + path + "_noisy_test_true",
+                repeat,
+                time.time() - t1,
+            )
+            torch.save(model.state_dict(), folder + "/" + path)
+            save_model(trial, folder + "/" + path + "_trial")
+
         plot_trial(
-            trial,
+            acc_history_dict,
+            trial.loss_history,
             model,
             folder + "_png" + "/" + path,
             repeat,
