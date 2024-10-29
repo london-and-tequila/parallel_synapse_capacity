@@ -33,7 +33,10 @@ def plot_trial(acc_history_dict, loss_history, model, path, repeat, t):
     plt.plot(trial.time, acc_noisy_test_list, label="noisy test")
     plt.legend()
     plt.title(
-        "acc. ={:.6f}, ".format(trial.acc.detach().cpu())
+        "acc. ={:.4f}, ".format(acc_original_list[-1])
+        + "acc. noisy train ={:.4f}, \n".format(acc_noisy_train_list[-1])
+        + "acc. noisy test ={:.4f}, ".format(acc_noisy_test_list[-1])
+        + "repeat "
         + str(repeat)
         + " * "
         + str(trial.Nepoch)
@@ -230,7 +233,7 @@ if __name__ == "__main__":
         "threslr": 1e-6,
         "adamlr": 0.003,
         "minAmpli": 1e-1,
-        "Nepoch": 1600,
+        "Nepoch": 160000,
         "P": args.P,
         "maxRecord": 400,
         "downSample": 100,
@@ -353,6 +356,9 @@ if __name__ == "__main__":
 
     trial = TrainParallelSynWithNoise(train_params)
     t1 = time.time()
+    is_plotted_original = False
+    is_plotted_noisy_train = False
+    is_plotted_noisy_test = False
     for repeat in range(800):
         acc_dict = trial.train_with_noise(model, data, t1)
         print(
@@ -365,18 +371,19 @@ if __name__ == "__main__":
             "noisy_train": trial.acc_noisy_train_history,
             "noisy_test": trial.acc_noisy_test_history,
         }
-        if acc_dict["original"] > ACCURACY_THRESHOLD:
+        if acc_dict["original"] > ACCURACY_THRESHOLD and not is_plotted_original:
             plot_trial(
                 acc_history_dict,
                 trial.loss_history,
                 model,
-                folder + "_png" + "/" + path + "_true",
+                folder + "_png" + "/" + path + "_original_true",
                 repeat,
                 time.time() - t1,
             )
             torch.save(model.state_dict(), folder + "/" + path)
             save_model(trial, folder + "/" + path + "_trial")
-        if acc_dict["noisy_train"] > ACCURACY_THRESHOLD:
+            is_plotted_original = True
+        if acc_dict["noisy_train"] > ACCURACY_THRESHOLD and not is_plotted_noisy_train:
             plot_trial(
                 acc_history_dict,
                 trial.loss_history,
@@ -387,7 +394,8 @@ if __name__ == "__main__":
             )
             torch.save(model.state_dict(), folder + "/" + path)
             save_model(trial, folder + "/" + path + "_trial")
-        if acc_dict["noisy_test"] > ACCURACY_THRESHOLD:
+            is_plotted_noisy_train = True
+        if acc_dict["noisy_test"] > ACCURACY_THRESHOLD and not is_plotted_noisy_test:
             plot_trial(
                 acc_history_dict,
                 trial.loss_history,
@@ -398,7 +406,7 @@ if __name__ == "__main__":
             )
             torch.save(model.state_dict(), folder + "/" + path)
             save_model(trial, folder + "/" + path + "_trial")
-
+            is_plotted_noisy_test = True
         plot_trial(
             acc_history_dict,
             trial.loss_history,
