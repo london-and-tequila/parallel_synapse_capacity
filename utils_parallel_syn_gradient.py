@@ -160,10 +160,10 @@ def plot_trial(trial, model, path, repeat, t):
     plt.hist(model.slope.detach().cpu().numpy().ravel(), bins=30)
     plt.title("slope hist")
     plt.subplot(2, 3, 6)
-    plt.hist(model.ampli.detach().cpu().numpy().ravel(), bins=30)
+    plt.hist(model.ampli.detach().cpu().numpy().ravel() ** 2, bins=30)
     plt.title(
         "ampli hist, {:.3f} of ampli < {:.3f}".format(
-            (model.ampli.detach().cpu().numpy().ravel() < trial.minAmpli).mean(),
+            (model.ampli.detach().cpu().numpy().ravel() ** 2 < trial.minAmpli).mean(),
             trial.minAmpli,
         )
     )

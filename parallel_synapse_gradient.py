@@ -11,6 +11,17 @@ from utils_parallel_syn_gradient import *
 ACCURACY_THRESHOLD = 0.999999
 
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 class ParallelSyn(torch.nn.Module):
     """
     Self-defined parallel synapse model class
@@ -155,7 +166,8 @@ class TrainParallelSyn:
             ).float()
 
         for k in range(self.Nepoch):
-            self.shuffle_invalid(model)
+            if self.shuffle:
+                self.shuffle_invalid(model)
 
             with torch.no_grad():
                 # clamp the slope to be non-negative
@@ -205,6 +217,7 @@ if __name__ == "__main__":
     parser.add_argument("M", type=int, help="M")
     parser.add_argument("P", type=int, help="P")
     parser.add_argument("seed", type=int, help="seed")
+    parser.add_argument("--shuffle", type=str2bool, default=True, help="repeat")
 
     args = parser.parse_args()
 
@@ -221,7 +234,7 @@ if __name__ == "__main__":
         "M": args.M,  # parallel synapse number
         "seed": args.seed,
         "device": device,
-        "distribution": "gaussian",  # affects initialization of threshold
+        "distribution": "uniform",  # affects initialization of threshold
     }
 
     train_params = {
@@ -234,7 +247,8 @@ if __name__ == "__main__":
         "maxRecord": 400,
         "downSample": 100,
         "NthresPool": int(args.P / 2),
-        "distribution": "gaussian",  # affects threshold resetting
+        "distribution": "uniform",  # affects threshold resetting
+        "shuffle": args.shuffle,
     }
 
     path = ""
@@ -251,6 +265,8 @@ if __name__ == "__main__":
         + str(train_params["P"])
         + "_seed_"
         + str(model_params["seed"])
+        + "_shuffle_"
+        + str(train_params["shuffle"])
     )
 
     # create folder to save the model and load the model if it exists
@@ -290,6 +306,8 @@ if __name__ == "__main__":
             + str(train_params["P"])
             + "_seed_"
             + str(model_params["seed"])
+            + "_shuffle_"
+            + str(train_params["shuffle"])
         )
 
         data_ = torch.hstack((inputX.cpu(), label.reshape(-1, 1).cpu()))
