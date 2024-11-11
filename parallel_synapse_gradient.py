@@ -141,6 +141,7 @@ class TrainParallelSyn:
 
     def train(self, model, label, inputX, t1):
         # set up optimizer
+        self.shuffle_count = torch.zeros((model.N, model.M), device=model.device)
         self.optim = torch.optim.Adam(
             [
                 {"params": model.ampli},
@@ -204,6 +205,9 @@ class TrainParallelSyn:
         """
         with torch.no_grad():
             mask = model.ampli < self.minAmpli
+            # only shuffle those synapses with shuffle_count less than shuffle_limit
+            mask = mask & (self.shuffle_count < self.shuffle_limit)
+            self.shuffle_count[mask] += 1
             model.thres[mask] = self.thresPool[
                 torch.randint(self.NthresPool, (mask.sum(),))
             ].ravel()
@@ -218,7 +222,9 @@ if __name__ == "__main__":
     parser.add_argument("P", type=int, help="P")
     parser.add_argument("seed", type=int, help="seed")
     parser.add_argument("--shuffle", type=str2bool, default=True, help="repeat")
-
+    parser.add_argument(
+        "--shuffle_limit", type=int, default=10000, help="shuffle limit"
+    )
     args = parser.parse_args()
 
     if torch.cuda.is_available():
@@ -249,6 +255,7 @@ if __name__ == "__main__":
         "NthresPool": int(args.P / 2),
         "distribution": "uniform",  # affects threshold resetting
         "shuffle": args.shuffle,
+        "shuffle_limit": args.shuffle_limit,
     }
 
     path = ""
@@ -267,6 +274,8 @@ if __name__ == "__main__":
         + str(model_params["seed"])
         + "_shuffle_"
         + str(train_params["shuffle"])
+        + "_shuffle_limit_"
+        + str(train_params["shuffle_limit"])
     )
 
     # create folder to save the model and load the model if it exists
@@ -308,6 +317,8 @@ if __name__ == "__main__":
             + str(model_params["seed"])
             + "_shuffle_"
             + str(train_params["shuffle"])
+            + "_shuffle_limit_"
+            + str(train_params["shuffle_limit"])
         )
 
         data_ = torch.hstack((inputX.cpu(), label.reshape(-1, 1).cpu()))
