@@ -62,6 +62,9 @@ class ParallelSyn(torch.nn.Module):
             torch.rand(self.N, self.M, device=params["device"])
         )
         self.theta = torch.nn.Parameter(torch.rand(1, device=params["device"]))
+        self.shuffle_count = torch.nn.Parameter(
+            torch.zeros((self.N, self.M), device=params["device"])
+        )
 
     def forward(self, data):
         """
@@ -141,7 +144,7 @@ class TrainParallelSyn:
 
     def train(self, model, label, inputX, t1):
         # set up optimizer
-        self.shuffle_count = torch.zeros((model.N, model.M), device=model.device)
+
         self.optim = torch.optim.Adam(
             [
                 {"params": model.ampli},
@@ -206,8 +209,10 @@ class TrainParallelSyn:
         with torch.no_grad():
             mask = model.ampli < self.minAmpli
             # only shuffle those synapses with shuffle_count less than shuffle_limit
-            mask = mask & (self.shuffle_count < self.shuffle_limit)
-            self.shuffle_count[mask] += 1
+            if self.shuffle_limit != -1:
+                mask = mask & (model.shuffle_count < self.shuffle_limit)
+
+                model.shuffle_count[mask] += 1
             model.thres[mask] = self.thresPool[
                 torch.randint(self.NthresPool, (mask.sum(),))
             ].ravel()
@@ -256,27 +261,40 @@ if __name__ == "__main__":
         "distribution": "uniform",  # affects threshold resetting
         "shuffle": args.shuffle,
         "shuffle_limit": args.shuffle_limit,
+        "N": args.N,
+        "M": args.M,
     }
 
     path = ""
     folder = "./N_" + str(model_params["N"])
     if model_params["distribution"] == "gaussian":
         folder += "_gaussian"
-    print(folder)
-    path += (
-        "N_"
-        + str(model_params["N"])
-        + "_M_"
-        + str(model_params["M"])
-        + "_P_"
-        + str(train_params["P"])
-        + "_seed_"
-        + str(model_params["seed"])
-        + "_shuffle_"
-        + str(train_params["shuffle"])
-        + "_shuffle_limit_"
-        + str(train_params["shuffle_limit"])
-    )
+    if args.shuffle and args.shuffle_limit == -1:
+        path += (
+            "N_"
+            + str(model_params["N"])
+            + "_M_"
+            + str(model_params["M"])
+            + "_P_"
+            + str(train_params["P"])
+            + "_seed_"
+            + str(model_params["seed"])
+        )
+    else:
+        path += (
+            "N_"
+            + str(model_params["N"])
+            + "_M_"
+            + str(model_params["M"])
+            + "_P_"
+            + str(train_params["P"])
+            + "_seed_"
+            + str(model_params["seed"])
+            + "_shuffle_"
+            + str(train_params["shuffle"])
+            + "_shuffle_limit_"
+            + str(train_params["shuffle_limit"])
+        )
 
     # create folder to save the model and load the model if it exists
     if os.path.isfile(folder + "/" + path + "_data") and os.path.isfile(
@@ -304,21 +322,6 @@ if __name__ == "__main__":
             randomSeed=model_params["seed"],
             device=model_params["device"],
             distribution=model_params["distribution"],
-        )
-        path = ""
-        path += (
-            "N_"
-            + str(model_params["N"])
-            + "_M_"
-            + str(model_params["M"])
-            + "_P_"
-            + str(train_params["P"])
-            + "_seed_"
-            + str(model_params["seed"])
-            + "_shuffle_"
-            + str(train_params["shuffle"])
-            + "_shuffle_limit_"
-            + str(train_params["shuffle_limit"])
         )
 
         data_ = torch.hstack((inputX.cpu(), label.reshape(-1, 1).cpu()))
