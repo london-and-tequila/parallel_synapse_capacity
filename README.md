@@ -26,15 +26,28 @@ python3 parallel_synapse_gradient.py 100 2 300 1
 ```
 This runs with N=100 input neurons, M=2 parallel synapses, P=300 patterns, and seed=1.
 
+
+**Modify input distribution**
 You can also modify the code to use different input distributions:
 - "uniform" - Uses uniform distribution for input initialization (default)
 - "gaussian" - Uses Gaussian distribution for input initialization
 
+**Modify synapse pruning**
+If ```shuffle = False```, pruning happens immediately after the synapse is silent.
 
-Additional options:
+If ```shuffle = False```, pruning happens immediately after ```shuffle_limit``` is reached.
 - `--shuffle` - Controls threshold shuffling, default: True
 - `--shuffle_limit` - Sets the limit for threshold shuffling, default 100000
 
+
+
+
+### Perceptron Model with Sign Constraints
+To calculate the memory capacity of the Perceptron with sign constraints, run the perceptron learning algorithm in:
+
+```
+perceptron_capacity_sign_constrained.ipynb
+```
 
 ### Unrestricted Model
 To calculate the memory capacity of the unrestricted model, run the two-step algorithm:
@@ -61,7 +74,7 @@ The figures from the manuscript can be reproduced by running the following Jupyt
 - `Fig2.ipynb` - Main results for Figure 2
 - `Fig3.ipynb` - Main results for Figure 3
 - `Fig5.ipynb` - Main results for Figure 5
-- `SuppleFig_A_a-e.ipynb` - Supplementary Figure A, panels a-e
+- `SuppleFig_A_a-e.ipynb` - Supplementary Figure A
 - `SuppleFig_B_a.ipynb` - Supplementary Figure B, panel a
 - `SuppleFig_B_b_d-g.ipynb` - Supplementary Figure B, panels b, d-g
 - `SuppleFig_B_c.ipynb` - Supplementary Figure B, panel c
