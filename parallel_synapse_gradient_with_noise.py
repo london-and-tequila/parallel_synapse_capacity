@@ -241,6 +241,7 @@ if __name__ == "__main__":
         "distribution": "uniform",  # affects threshold resetting
         "noise_size": args.noise_size,
         "noise_repeat": args.noise_repeat,
+        "shuffle_limit": -1,
     }
 
     path = ""
