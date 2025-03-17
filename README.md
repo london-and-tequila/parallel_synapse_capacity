@@ -39,9 +39,8 @@ If ```shuffle = False```, pruning happens immediately after ```shuffle_limit``` 
 - `--shuffle` - Controls threshold shuffling, default: True
 - `--shuffle_limit` - Sets the limit for threshold shuffling, default 100000
 
-
-
-
+**Add noise in training data**
+Run ```parallel_synapse_gradient_with_noise.py``` instead.
 ### Perceptron Model with Sign Constraints
 To calculate the memory capacity of the Perceptron with sign constraints, run the perceptron learning algorithm in:
 
