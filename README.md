@@ -26,6 +26,16 @@ python3 parallel_synapse_gradient.py 100 2 300 1
 ```
 This runs with N=100 input neurons, M=2 parallel synapses, P=300 patterns, and seed=1.
 
+You can also modify the code to use different input distributions:
+- "uniform" - Uses uniform distribution for input initialization (default)
+- "gaussian" - Uses Gaussian distribution for input initialization
+
+
+Additional options:
+- `--shuffle` - Controls threshold shuffling, default: True
+- `--shuffle_limit` - Sets the limit for threshold shuffling, default 100000
+
+
 ### Unrestricted Model
 To calculate the memory capacity of the unrestricted model, run the two-step algorithm:
 
